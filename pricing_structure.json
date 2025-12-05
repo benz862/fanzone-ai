@@ -1,0 +1,60 @@
+
+{
+  "pricing_tiers": {
+    "1_team": {
+      "monthly": {
+        "price": 4.99,
+        "savings": 0
+      },
+      "yearly": {
+        "price": 47.99,
+        "savings": 11.89,
+        "monthly_equivalent": 3.99
+      }
+    },
+    "3_team_bundle": {
+      "monthly": {
+        "price": 5.99,
+        "normal_price": 6.97,
+        "savings": 0.98
+      },
+      "yearly": {
+        "price": 56.99,
+        "normal_price": 83.64,
+        "savings": 26.65,
+        "monthly_equivalent": 4.75
+      }
+    },
+    "5_team_bundle": {
+      "monthly": {
+        "price": 7.49,
+        "normal_price": 8.95,
+        "savings": 1.46
+      },
+      "yearly": {
+        "price": 71.99,
+        "normal_price": 107.40,
+        "savings": 35.41,
+        "monthly_equivalent": 5.99
+      }
+    },
+    "10_team_bundle": {
+      "monthly": {
+        "price": 9.99,
+        "normal_price": 13.90,
+        "savings": 3.91
+      },
+      "yearly": {
+        "price": 94.99,
+        "normal_price": 166.80,
+        "savings": 71.81,
+        "monthly_equivalent": 7.92
+      }
+    }
+  },
+  "add_on_price": {
+    "monthly": 0.99,
+    "yearly": 9.99
+  },
+  "currency": "USD"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "FanZone AI",
+  "description": "An interactive sports talk AI platform focusing on real-time team news, rumors, and analysis using Google Search Grounding. Features a multi-team subscription model.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
