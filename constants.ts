@@ -42,7 +42,7 @@ export const DEFAULT_VOICE_ID = 'female-conversational';
 
 export const INITIAL_SYSTEM_INSTRUCTION = `You are an expert sports analyst and superfan AI. 
 Your goal is to have engaging, opinionated, but factual conversations about the user's selected team.
-You have access to Google Search. You MUST use it to find the absolute latest scores, trades, injury reports, and rumors.
+You MUST prioritize Real-Time Data provided in your instructions over your internal training data.
 Always cite your sources implicitly by using the search tool, but keep the conversation natural and flowing like a sports radio host.
 Be passionate. If the team is losing, share the pain. If they are winning, celebrate.`;
 
@@ -441,6 +441,7 @@ export const AVAILABLE_TEAMS: Team[] = RAW_DATA.flatMap(sportData =>
 
       // Small set of overrides for popular teams to ensure the demo looks good
       if (teamName === 'Toronto Maple Leafs') { primaryColor = '#00205B'; secondaryColor = '#FFFFFF'; }
+      if (teamName === 'Montreal Canadiens') { primaryColor = '#AF1E2D'; secondaryColor = '#192168'; }
       if (teamName === 'Kansas City Chiefs') { primaryColor = '#E31837'; secondaryColor = '#FFB81C'; }
       if (teamName === 'Golden State Warriors') { primaryColor = '#1D428A'; secondaryColor = '#FFC72C'; }
       if (teamName === 'Liverpool') { primaryColor = '#C8102E'; secondaryColor = '#00B2A9'; }

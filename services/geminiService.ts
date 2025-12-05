@@ -120,6 +120,41 @@ export class GeminiService {
       return `Who's everyone watching in the ${teamName} game next?`; 
     }
   }
+
+  /**
+   * Fetches the absolute latest context (scores, news, injuries) for a team
+   * to inject into the Voice AI system instructions.
+   */
+  public async getRealTimeContext(teamName: string): Promise<string> {
+    const today = new Date().toLocaleDateString();
+    const prompt = `
+      Find the absolute latest information for the ${teamName} as of today, ${today}.
+      
+      I need a briefing summary containing:
+      1. The result of their last game (with score).
+      2. Who they play next (date and opponent).
+      3. Key injuries or roster changes (current status).
+      4. Top 1 or 2 trending rumors or storylines right now.
+
+      Format as a concise text block that can be read by an AI to understand the current state of the team.
+      Do not use markdown formatting like bolding, just plain text.
+    `;
+
+    try {
+      const result = await this.ai.models.generateContent({
+        model: this.currentModel,
+        contents: prompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+        }
+      });
+      
+      return result.text || "No current news available.";
+    } catch (error) {
+      console.error("Failed to fetch real-time context", error);
+      return "Unable to fetch real-time news at this moment.";
+    }
+  }
 }
 
 export const geminiService = new GeminiService();

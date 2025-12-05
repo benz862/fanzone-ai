@@ -1,6 +1,7 @@
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
 import { createPcmBlob, decodeAudioData, base64ToArrayBuffer } from "../utils/audioUtils";
 import { memoryService } from "./memoryService";
+import { geminiService } from "./geminiService";
 
 interface LiveServiceCallbacks {
   onStatusChange: (isConnected: boolean) => void;
@@ -82,7 +83,17 @@ export class LiveService {
       // 2. Start Microphone
       this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      // 3. Prepare System Instructions
+      // 3. FETCH REAL-TIME CONTEXT
+      // We fetch the latest news/scores textually first, then inject it into the voice AI.
+      // This bridges the gap since Live API tools can be unstable.
+      let realTimeContext = "Loading latest news...";
+      try {
+        realTimeContext = await geminiService.getRealTimeContext(teamName);
+      } catch (e) {
+        console.warn("Could not fetch real-time context, proceeding with generic knowledge.");
+      }
+
+      // 4. Prepare System Instructions
       const subscribedList = subscribedTeams.join(', ');
       const userLang = navigator.language || 'en-US';
       const memories = memoryService.getMemories();
@@ -91,6 +102,10 @@ export class LiveService {
       const systemInstruction = `
         You are an expert sports analyst and superfan AI hosting a live radio show.
         Your ACTIVE TOPIC is the ${this.activeTeam}.
+
+        !!! REAL-TIME DATA (AS OF TODAY) !!!
+        ${realTimeContext}
+        !!! END REAL-TIME DATA !!!
 
         SUBSCRIBED TEAMS: ${subscribedList}.
         USER'S DETECTED BROWSER LANGUAGE: ${userLang}.
@@ -148,6 +163,10 @@ export class LiveService {
 
         5. PERSONALITY MODE
         Speak like a passionate sports insider for subscribed teams, but remain neutral otherwise.
+        
+        CRITICAL: 
+        Use the "REAL-TIME DATA" provided above to answer questions about the last game or next game. 
+        Do NOT rely on your internal training data for recent events if the Real-Time Data contradicts it.
 
         --- MEMORY SYSTEM RULES ---
         
@@ -166,7 +185,7 @@ export class LiveService {
         • Do NOT include this JSON if there is nothing new to save.
       `;
       
-      // 4. Connect to Gemini Live
+      // 5. Connect to Gemini Live
       // NOTE: googleSearch tool removed to prevent 'Internal Error' in Live preview
       this.sessionPromise = this.ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
