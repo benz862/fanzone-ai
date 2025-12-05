@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
 import { GroundingSource } from "../types";
 
@@ -135,8 +136,9 @@ export class GeminiService {
       2. Who they play next (date and opponent).
       3. Key injuries or roster changes (current status).
       4. Top 1 or 2 trending rumors or storylines right now.
+      5. Current League Leaders and Reigning Champions.
 
-      Format as a concise text block that can be read by an AI to understand the current state of the team.
+      Format as a concise text block that can be read by an AI to understand the current state of the team and league.
       Do not use markdown formatting like bolding, just plain text.
     `;
 
@@ -153,6 +155,44 @@ export class GeminiService {
     } catch (error) {
       console.error("Failed to fetch real-time context", error);
       return "Unable to fetch real-time news at this moment.";
+    }
+  }
+
+  /**
+   * Fetches structured standings data for a league
+   */
+  public async fetchStandingsData(league: string): Promise<any> {
+    const prompt = `
+      Find the current standings for ${league} for the current season.
+      Return a JSON object with the following structure:
+      {
+        "league": "${league}",
+        "teams": [
+          { "rank": 1, "name": "Team A", "wins": 10, "losses": 2, "points": 20 }
+        ]
+      }
+      If exact points aren't relevant (like Baseball uses games back, or Football uses diff), map strictly to 'points' or 'diff' if needed, but prefer points for sorting.
+      Return ONLY JSON. Limit to top 15 teams.
+    `;
+
+    try {
+       const result = await this.ai.models.generateContent({
+        model: this.currentModel,
+        contents: prompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+          responseMimeType: "application/json"
+        }
+      });
+      
+      const jsonStr = result.text;
+      if (jsonStr) {
+        return JSON.parse(jsonStr);
+      }
+      return null;
+    } catch (e) {
+      console.error("Fetch standings failed", e);
+      return null;
     }
   }
 }

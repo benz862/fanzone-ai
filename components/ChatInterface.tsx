@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Team, VoiceOption } from '../types';
 import { liveService } from '../services/liveService';
 import { AudioVisualizer } from './AudioVisualizer';
 import { Button } from './Button';
+import { VisualWidget, StandingsData } from './VisualWidgets';
 
 interface ChatInterfaceProps {
   activeTeam: Team;
@@ -14,6 +16,8 @@ interface TranscriptItem {
   id: string;
   role: 'user' | 'model';
   text: string;
+  widgetType?: 'standings' | 'score';
+  widgetData?: any;
 }
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({ activeTeam, subscribedTeams, activeVoice }) => {
@@ -62,8 +66,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ activeTeam, subscr
       onTranscript: (sender, text, isFinal) => {
         setTranscripts((prev) => {
            const last = prev[prev.length - 1];
-           // If the last message is from the same sender, append the chunk
-           if (last && last.role === sender) {
+           // If the last message is from the same sender AND DOES NOT HAVE A WIDGET, append the chunk
+           if (last && last.role === sender && !last.widgetType) {
              return [
                ...prev.slice(0, -1),
                { ...last, text: last.text + text }
@@ -75,6 +79,18 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ activeTeam, subscr
       },
       onAudioData: (data) => setAudioData(data),
       onError: (msg) => setError(msg),
+      onWidget: (type, data) => {
+          setTranscripts(prev => [
+              ...prev,
+              { 
+                  id: Date.now().toString(), 
+                  role: 'model', 
+                  text: '', 
+                  widgetType: type as any, 
+                  widgetData: data 
+              }
+          ]);
+      }
     });
 
     return () => {
@@ -200,17 +216,25 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ activeTeam, subscr
                 </div>
             ) : (
                 transcripts.map((t, i) => (
-                    <div key={`${t.id}-${i}`} className={`flex ${t.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[85%] p-3 rounded-xl text-sm ${
-                            t.role === 'user' 
-                            ? 'bg-slate-800 text-slate-300 rounded-tr-none' 
-                            : 'bg-blue-900/20 border border-blue-900/50 text-blue-100 rounded-tl-none'
-                        }`}>
-                            <span className="block text-[10px] font-bold opacity-50 mb-1 uppercase">
-                                {t.role === 'user' ? 'You' : 'FanZone AI'}
-                            </span>
-                            {t.text}
-                        </div>
+                    <div key={`${t.id}-${i}`} className={`flex flex-col w-full ${t.role === 'user' ? 'items-end' : 'items-start'}`}>
+                        {/* Render Text Bubble if there is text */}
+                        {t.text && (
+                          <div className={`max-w-[85%] p-3 rounded-xl text-sm mb-2 ${
+                              t.role === 'user' 
+                              ? 'bg-slate-800 text-slate-300 rounded-tr-none' 
+                              : 'bg-blue-900/20 border border-blue-900/50 text-blue-100 rounded-tl-none'
+                          }`}>
+                              <span className="block text-[10px] font-bold opacity-50 mb-1 uppercase">
+                                  {t.role === 'user' ? 'You' : 'FanZone AI'}
+                              </span>
+                              {t.text}
+                          </div>
+                        )}
+                        
+                        {/* Render Widget if Present */}
+                        {t.widgetType && t.widgetData && (
+                           <VisualWidget type={t.widgetType} data={t.widgetData} />
+                        )}
                     </div>
                 ))
             )}

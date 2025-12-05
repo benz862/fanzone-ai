@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
 import { createPcmBlob, decodeAudioData, base64ToArrayBuffer } from "../utils/audioUtils";
 import { memoryService } from "./memoryService";
@@ -8,6 +9,7 @@ interface LiveServiceCallbacks {
   onTranscript: (sender: 'user' | 'model', text: string, isFinal: boolean) => void;
   onAudioData: (frequencyData: Uint8Array) => void;
   onError: (error: string) => void;
+  onWidget?: (type: string, data: any) => void; // New callback for widgets
 }
 
 export class LiveService {
@@ -168,6 +170,12 @@ export class LiveService {
         Use the "REAL-TIME DATA" provided above to answer questions about the last game or next game. 
         Do NOT rely on your internal training data for recent events if the Real-Time Data contradicts it.
 
+        --- VISUAL WIDGETS ---
+        If the user asks to SEE the "standings", "table", "league leaders", or "score", you must trigger a visual widget.
+        Output a JSON block in this format:
+        { "show_widget": "standings", "league": "NHL" }
+        Do NOT try to read the whole table out loud. Just say "Here are the current standings for the NHL." and send the JSON.
+        
         --- MEMORY SYSTEM RULES ---
         
         1. USE MEMORY
@@ -390,26 +398,51 @@ export class LiveService {
       
       let displayTranscript = outputTranscript;
       
-      // JSON Memory Parsing
+      // JSON Pattern Matching for Memory and Widgets
       const memoryPattern = /\{"memory_to_write":\s*\[(.*?)\]\}/s;
-      const match = this.responseBuffer.match(memoryPattern);
+      const widgetPattern = /\{"show_widget":\s*"(.*?)",\s*"league":\s*"(.*?)"\}/s;
       
-      if (match) {
+      // Check for Memory
+      const memMatch = this.responseBuffer.match(memoryPattern);
+      if (memMatch) {
          try {
-           const jsonStr = match[0];
-           const parsed = JSON.parse(jsonStr);
+           const parsed = JSON.parse(memMatch[0]);
            if (parsed.memory_to_write) {
              memoryService.saveMemories(parsed.memory_to_write);
              displayTranscript = displayTranscript.replace(memoryPattern, '');
              this.responseBuffer = this.responseBuffer.replace(memoryPattern, '');
            }
-         } catch (e) {
-           // Wait for more chunks
-         }
+         } catch (e) {}
+      }
+
+      // Check for Widget
+      const widgetMatch = this.responseBuffer.match(widgetPattern);
+      if (widgetMatch) {
+          try {
+            const parsed = JSON.parse(widgetMatch[0]);
+            if (parsed.show_widget && this.callbacks?.onWidget) {
+                // We strip the command from text so it doesn't clutter chat
+                displayTranscript = displayTranscript.replace(widgetPattern, '');
+                this.responseBuffer = this.responseBuffer.replace(widgetPattern, '');
+                
+                // Trigger the async fetch for widget data
+                if (parsed.show_widget === 'standings') {
+                   // Async fetch content
+                   geminiService.fetchStandingsData(parsed.league).then(data => {
+                       if (data && this.callbacks?.onWidget) {
+                           this.callbacks.onWidget('standings', data);
+                       }
+                   });
+                }
+            }
+          } catch(e) {}
       }
 
       // Cleanup visible text
-      const cleanText = displayTranscript.replace(/\{"memory_to_write.*/, '').replace(/.*\}\}/, '');
+      const cleanText = displayTranscript
+        .replace(/\{"memory_to_write.*/, '')
+        .replace(/\{"show_widget.*/, '')
+        .replace(/.*\}\}/, '');
       
       if (cleanText.trim()) {
         this.callbacks?.onTranscript('model', cleanText, !!message.serverContent?.turnComplete);
