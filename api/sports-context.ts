@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import fetch from "node-fetch";
 
-const THESPORTSDB_API_KEY = process.env.THESPORTSDB_API_KEY ?? "1"; // public dev key
+const THESPORTSDB_API_KEY = process.env.THESPORTSDB_API_KEY ?? "1";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const team = req.query.team as string;
