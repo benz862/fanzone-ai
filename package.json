@@ -8,11 +8,13 @@
     "dev:api": "vercel dev",
     "build": "vite build",
     "preview": "vite preview",
-    "test:api": "node test-api.js"
+    "test:api": "node test-api.js",
+    "test:chat": "node test-chat-api.js"
   },
   "dependencies": {
     "@google/genai": "^1.31.0",
     "node-fetch": "^3.3.2",
+    "openai": "^6.10.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1"
   },
