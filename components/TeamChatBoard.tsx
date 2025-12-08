@@ -56,12 +56,58 @@ export const TeamChatBoard: React.FC<TeamChatBoardProps> = ({ activeTeam, userna
       return;
     }
 
-    // 2. Post
-    chatBoardService.addMessage(activeTeam.id, username, inputText.trim());
-    setInputText('');
+    const userMessage = inputText.trim();
     
-    // 3. Refresh immediately
+    // 2. Post user message
+    chatBoardService.addMessage(activeTeam.id, username, userMessage);
+    setInputText('');
     setMessages(chatBoardService.getMessages(activeTeam.id));
+    
+    // 3. Check if message is a question for AI (starts with ? or contains question words)
+    const isQuestion = userMessage.startsWith('?') || 
+                       /^(what|when|where|who|why|how|tell me|explain|describe)/i.test(userMessage) ||
+                       userMessage.includes('?');
+    
+    if (isQuestion) {
+      // Get AI response using our new fanzone-chat API
+      try {
+        setIsBotGenerating(true);
+        const response = await fetch('/api/fanzone-chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: userMessage.replace(/^\?/, '').trim(), // Remove leading ?
+            team: activeTeam.name
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.reply) {
+            chatBoardService.addMessage(activeTeam.id, "FanZone AI", data.reply);
+            setMessages(chatBoardService.getMessages(activeTeam.id));
+          } else {
+            throw new Error(data.error || 'No reply from AI');
+          }
+        } else {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'AI service unavailable');
+        }
+      } catch (aiError: any) {
+        console.error("AI chat error:", aiError);
+        chatBoardService.addMessage(
+          activeTeam.id, 
+          "FanZone AI", 
+          `Sorry, I'm having trouble right now. ${aiError.message || 'Please try again later.'}`
+        );
+        setMessages(chatBoardService.getMessages(activeTeam.id));
+      } finally {
+        setIsBotGenerating(false);
+      }
+    }
+    
     setIsSending(false);
   };
 
@@ -105,14 +151,26 @@ export const TeamChatBoard: React.FC<TeamChatBoardProps> = ({ activeTeam, userna
            </div>
         </div>
         
-        <button 
-            onClick={() => handleSummonBot(false)}
-            disabled={isBotGenerating}
-            className="text-xs bg-purple-900/50 hover:bg-purple-900/80 text-purple-200 border border-purple-800 rounded-full px-3 py-1 flex items-center gap-2 transition-colors"
-        >
-            {isBotGenerating ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-sparkles"></i>}
-            Spark Convo
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+              onClick={() => {
+                setInputText('? What\'s the latest news about the team?');
+              }}
+              className="text-xs bg-blue-900/50 hover:bg-blue-900/80 text-blue-200 border border-blue-800 rounded-full px-3 py-1 flex items-center gap-2 transition-colors"
+              title="Ask AI a question"
+          >
+              <i className="fas fa-robot"></i>
+              Ask AI
+          </button>
+          <button 
+              onClick={() => handleSummonBot(false)}
+              disabled={isBotGenerating}
+              className="text-xs bg-purple-900/50 hover:bg-purple-900/80 text-purple-200 border border-purple-800 rounded-full px-3 py-1 flex items-center gap-2 transition-colors"
+          >
+              {isBotGenerating ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-sparkles"></i>}
+              Spark Convo
+          </button>
+        </div>
       </div>
 
       {/* Messages Area */}
@@ -126,13 +184,18 @@ export const TeamChatBoard: React.FC<TeamChatBoardProps> = ({ activeTeam, userna
           messages.map((msg) => {
             const isMe = msg.username === username;
             const isBot = msg.username === 'FanZone Bot';
+            const isAI = msg.username === 'FanZone AI';
             
             return (
               <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                 <div className="flex items-end gap-2 max-w-[80%]">
                   {!isMe && (
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border border-slate-700 ${isBot ? 'bg-gradient-to-br from-purple-600 to-blue-600 text-white shadow-lg' : 'bg-slate-800 text-slate-400'}`}>
-                      {isBot ? <i className="fas fa-robot"></i> : msg.username.substring(0, 2).toUpperCase()}
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border border-slate-700 ${
+                      isBot ? 'bg-gradient-to-br from-purple-600 to-blue-600 text-white shadow-lg' : 
+                      isAI ? 'bg-gradient-to-br from-blue-600 to-cyan-600 text-white shadow-lg' :
+                      'bg-slate-800 text-slate-400'
+                    }`}>
+                      {isBot || isAI ? <i className="fas fa-robot"></i> : msg.username.substring(0, 2).toUpperCase()}
                     </div>
                   )}
                   
@@ -141,14 +204,21 @@ export const TeamChatBoard: React.FC<TeamChatBoardProps> = ({ activeTeam, userna
                       ? 'bg-blue-600 text-white rounded-br-none' 
                       : isBot
                         ? 'bg-slate-800 text-slate-200 border border-purple-500/50 shadow-purple-900/20 shadow-lg rounded-bl-none'
+                        : isAI
+                        ? 'bg-slate-800 text-slate-200 border border-blue-500/50 shadow-blue-900/20 shadow-lg rounded-bl-none'
                         : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-bl-none'
                   }`}>
                     {!isMe && (
                       <div className="flex items-center gap-2 mb-1">
-                        <span className={`block text-[10px] font-bold ${isBot ? 'text-purple-400' : 'text-slate-500'}`}>
+                        <span className={`block text-[10px] font-bold ${
+                          isBot ? 'text-purple-400' : 
+                          isAI ? 'text-blue-400' : 
+                          'text-slate-500'
+                        }`}>
                             {msg.username}
                         </span>
                         {isBot && <span className="text-[8px] bg-purple-900 text-white px-1 rounded uppercase tracking-wide">AI System</span>}
+                        {isAI && <span className="text-[8px] bg-blue-900 text-white px-1 rounded uppercase tracking-wide">Real-Time AI</span>}
                       </div>
                     )}
                     {msg.text}
@@ -177,10 +247,10 @@ export const TeamChatBoard: React.FC<TeamChatBoardProps> = ({ activeTeam, userna
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder={`Message ${activeTeam.name} fans...`}
+            placeholder={`Message ${activeTeam.name} fans... (Start with ? or ask a question for AI)`}
             className="flex-1 bg-slate-950 border border-slate-700 rounded-full px-4 py-2 text-white focus:outline-none focus:border-blue-500 placeholder-slate-600"
             maxLength={200}
-            disabled={isSending}
+            disabled={isSending || isBotGenerating}
           />
           <button 
             type="submit" 
