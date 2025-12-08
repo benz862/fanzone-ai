@@ -15,7 +15,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const API_KEY = process.env.THESPORTSDB_API_KEY ?? "1";
+    // Default to free demo API key "123" if not set
+    const API_KEY = process.env.THESPORTSDB_API_KEY ?? "123";
+    console.log("DEBUG: API_KEY is set:", API_KEY ? `${API_KEY.substring(0, 3)}...` : "NOT SET");
 
     const searchUrl = `https://www.thesportsdb.com/api/v1/json/${API_KEY}/searchteams.php?t=${encodeURIComponent(team)}`;
     console.log("DEBUG: Fetching team search URL:", searchUrl);
@@ -25,7 +27,21 @@ export default async function handler(req, res) {
     
     if (!teamRes.ok) {
       const errorText = await teamRes.text();
+      const isHtml = errorText.trim().toLowerCase().startsWith('<!doctype') || errorText.trim().toLowerCase().startsWith('<html');
+      
+      if (isHtml) {
+        // TheSportsDB returned HTML instead of JSON - likely invalid API key or endpoint issue
+        const apiKeyStatus = API_KEY === "1" ? "using default demo key '1'" : "API key is set";
+        throw new Error(`TheSportsDB API returned HTML error page (404). This could mean: 1) The API key is invalid, 2) TheSportsDB API endpoints have changed or are down, 3) The endpoint structure is incorrect. Current status: ${apiKeyStatus}. Check TheSportsDB status at https://www.thesportsdb.com/api.php or verify your API key is correct in Vercel environment variables.`);
+      }
+      
       throw new Error(`Team search failed: ${teamRes.status} ${teamRes.statusText}. Response: ${errorText.substring(0, 200)}`);
+    }
+    
+    const contentType = teamRes.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      const responseText = await teamRes.text();
+      throw new Error(`Expected JSON but got ${contentType}. Response: ${responseText.substring(0, 200)}`);
     }
     
     const teamJson = await teamRes.json();
