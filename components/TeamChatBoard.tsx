@@ -62,53 +62,52 @@ export const TeamChatBoard: React.FC<TeamChatBoardProps> = ({ activeTeam, userna
     chatBoardService.addMessage(activeTeam.id, username, userMessage);
     setInputText('');
     setMessages(chatBoardService.getMessages(activeTeam.id));
+    setIsSending(false); // Allow user to type again while AI is thinking
     
-    // 3. Check if message is a question for AI (starts with ? or contains question words)
+    // 3. Check if message is a question for AI (starts with ? or contains question words, or always respond)
     const isQuestion = userMessage.startsWith('?') || 
                        /^(what|when|where|who|why|how|tell me|explain|describe)/i.test(userMessage) ||
                        userMessage.includes('?');
     
-    if (isQuestion) {
-      // Get AI response using our new fanzone-chat API
-      try {
-        setIsBotGenerating(true);
-        const response = await fetch('/api/fanzone-chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            message: userMessage.replace(/^\?/, '').trim(), // Remove leading ?
-            team: activeTeam.name
-          })
-        });
+    // Always get AI response for better conversation flow
+    // Get AI response using our new fanzone-chat API
+    try {
+      setIsBotGenerating(true);
+      const cleanMessage = userMessage.replace(/^\?/, '').trim();
+      const response = await fetch('/api/fanzone-chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: cleanMessage,
+          team: activeTeam.name
+        })
+      });
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.reply) {
-            chatBoardService.addMessage(activeTeam.id, "FanZone AI", data.reply);
-            setMessages(chatBoardService.getMessages(activeTeam.id));
-          } else {
-            throw new Error(data.error || 'No reply from AI');
-          }
+      if (response.ok) {
+        const data = await response.json();
+        if (data.reply) {
+          chatBoardService.addMessage(activeTeam.id, "FanZone AI", data.reply);
+          setMessages(chatBoardService.getMessages(activeTeam.id));
         } else {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'AI service unavailable');
+          throw new Error(data.error || 'No reply from AI');
         }
-      } catch (aiError: any) {
-        console.error("AI chat error:", aiError);
-        chatBoardService.addMessage(
-          activeTeam.id, 
-          "FanZone AI", 
-          `Sorry, I'm having trouble right now. ${aiError.message || 'Please try again later.'}`
-        );
-        setMessages(chatBoardService.getMessages(activeTeam.id));
-      } finally {
-        setIsBotGenerating(false);
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'AI service unavailable');
       }
+    } catch (aiError: any) {
+      console.error("AI chat error:", aiError);
+      chatBoardService.addMessage(
+        activeTeam.id, 
+        "FanZone AI", 
+        `Sorry, I'm having trouble right now. ${aiError.message || 'Please try again later.'}`
+      );
+      setMessages(chatBoardService.getMessages(activeTeam.id));
+    } finally {
+      setIsBotGenerating(false);
     }
-    
-    setIsSending(false);
   };
 
   const handleSummonBot = async (isAuto: boolean = false) => {
@@ -230,6 +229,19 @@ export const TeamChatBoard: React.FC<TeamChatBoardProps> = ({ activeTeam, userna
               </div>
             );
           })
+        )}
+        {isBotGenerating && (
+          <div className="flex items-start gap-2">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border border-slate-700 bg-gradient-to-br from-blue-600 to-cyan-600 text-white shadow-lg">
+              <i className="fas fa-robot"></i>
+            </div>
+            <div className="bg-slate-800 text-slate-200 border border-blue-500/50 shadow-blue-900/20 shadow-lg rounded-2xl rounded-tl-none p-3 text-sm">
+              <div className="flex items-center gap-2">
+                <i className="fas fa-spinner fa-spin text-blue-400"></i>
+                <span className="text-blue-400">FanZone AI is thinking...</span>
+              </div>
+            </div>
+          </div>
         )}
         <div ref={bottomRef} />
       </div>
